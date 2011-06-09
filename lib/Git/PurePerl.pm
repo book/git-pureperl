@@ -165,7 +165,7 @@ sub _ref_names_recursive {
 
 =head1 METHODS
 
-=head2 Shortcuts
+=head2 Read Shortcuts
 
 =head3 ref_names()
 
@@ -281,15 +281,15 @@ sub head {
 
 =head3 all_sha1s()
 
-    my @shas = @{ $git->all_sha1s->next };
+    my $sha_stream = $git->all_sha1s;
+    my @shas;
+    while ( my $sha_block = $sha_stream->next ) {
+        push @shas, @{$sha_block};
+    }
 
 Returns a Data::Stream::Bulk::Cat object that is primed with two streams, from
-loose (?) and pack (?) respectively, containing all SHAs in the git repo.
-
-Calling next() on that DSBC object returns an array ref containing all SHAs in
-the repo.
-
-I have no idea why it does this in such an odd manner.
+loose (?) and pack (?) respectively, which can be interrogated to retrieve all
+SHAs from the repo.
 
 =cut
 
@@ -309,17 +309,18 @@ sub all_sha1s {
 
 =head3 all_objects()
 
-    my @pp_objects = @{ $git->all_objects->next };
+    my $object_stream = $git->all_sha1s;
+    my @pp_objects;
+    while ( my $object_block = $object_stream->next ) {
+        push @pp_objects, @{$object_block};
+    }
 
 Returns a Data::Stream::Bulk::Filter object that is primed with a list of all
 SHAs in the repo and a sub that instructs the G::PP object to call get_objects()
 on that list.
 
-Calling next() on that DSBF object returns an array ref containing all objects
-relating to SHAs in the repo, like Git::PurePerl::Object::Blob, Commit, Tree or
-Tag.
-
-I have no idea why it does this in such an odd manner.
+The DSBF object can be interrogated to retrieve all objects relating to SHAs in
+the repo, like Git::PurePerl::Object::Blob, Commit, Tree or Tag.
 
 =cut
 
