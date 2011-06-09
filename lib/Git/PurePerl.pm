@@ -324,12 +324,6 @@ the repo, like Git::PurePerl::Object::Blob, Commit, Tree or Tag.
 
 =cut
 
-=head2 Read Operations
-
-=head2 Write Operations
-
-=cut
-
 sub all_objects {
     my $self   = shift;
     my $stream = $self->all_sha1s;
@@ -338,6 +332,10 @@ sub all_objects {
         stream => $stream,
     );
 }
+
+=head2 Read Operations
+
+=cut
 
 sub ref_sha1 {
     my ( $self, $wantref ) = @_;
@@ -462,6 +460,10 @@ sub create_object {
         confess "unknown kind $kind: $content";
     }
 }
+
+=head2 Write Operations
+
+=cut
 
 sub put_object {
     my ( $self, $object, $ref ) = @_;
