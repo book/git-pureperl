@@ -37,6 +37,27 @@ use IO::Socket::INET;
 use Path::Class;
 use namespace::autoclean;
 
+=head1 NAME
+
+Git::PurePerl - A Pure Perl interface to Git repositories
+
+=head1 SYNOPSIS
+
+    my $git = Git::PurePerl->new(
+        directory => '/path/to/git/'
+    );
+    $git->master->committer;
+    $git->master->comment;
+    $git->get_object($git->master->tree);
+
+=head1 DESCRIPTION
+
+This module is a Pure Perl interface to Git repositories.
+
+It was mostly based on Grit L<http://grit.rubyforge.org/>.
+
+=cut
+
 our $VERSION = '0.48';
 $VERSION = eval $VERSION;
 
@@ -142,6 +163,20 @@ sub _ref_names_recursive {
     }
 }
 
+=head1 METHODS
+
+=head2 Shortcuts
+
+=head3 ref_names()
+
+    my @ref_names = $git->ref_names;
+
+Returns a list of ref names as path to the files containing their SHAs, covers
+local branches, remote branches and tags. The ref names can be used by other
+functions of Git::PP.
+
+=cut
+
 sub ref_names {
     my $self = shift;
     my @names;
@@ -163,14 +198,144 @@ sub ref_names {
     return @names;
 }
 
+=head3 refs_sha1()
+
+    my @ref_shas = $git->refs_sha1;
+
+Returns a list of shas representing all known refs in the repo.
+
+=cut
+
 sub refs_sha1 {
     my $self = shift;
     return map { $self->ref_sha1($_) } $self->ref_names;
 }
 
+=head3 refs()
+
+    my @refs = $git->refs;
+
+Returns a list of Git::PurePerl::Object::Commit or ::Tag objects representing
+all known refs in the repo.
+
+=cut
+
 sub refs {
     my $self = shift;
     return map { $self->ref($_) } $self->ref_names;
+}
+
+=head3 master_sha1()
+
+    my $master_commit_sha = $git->master_sha1;
+
+Returns the SHA of the commit currently marking the head of the branch 'master'.
+
+=cut
+
+sub master_sha1 {
+    my $self = shift;
+    return $self->ref_sha1('refs/heads/master');
+}
+
+=head3 master()
+
+    my $master_commit = $git->master;
+
+Returns a Git::PurePerl::Object::Commit object representing the commit currently
+marking the head of the branch 'master'.
+
+=cut
+
+sub master {
+    my $self = shift;
+    return $self->ref('refs/heads/master');
+}
+
+=head3 head_sha1()
+
+    my $head_commit_sha = $git->head_sha1;
+
+Returns the SHA of the the commit currently associated with HEAD in the repo.
+
+=cut
+
+sub head_sha1 {
+    my $self = shift;
+    return $self->ref_sha1('HEAD');
+}
+
+=head3 head()
+
+    my $head_commit = $git->head;
+
+Returns a Git::PurePerl::Object::Commit object representing the commit currently
+associated with HEAD in the repo.
+
+=cut
+
+sub head {
+    my $self = shift;
+    return $self->ref('HEAD');
+}
+
+=head3 all_sha1s()
+
+    my @shas = @{ $git->all_sha1s->next };
+
+Returns a Data::Stream::Bulk::Cat object that is primed with two streams, from
+loose (?) and pack (?) respectively, containing all SHAs in the git repo.
+
+Calling next() on that DSBC object returns an array ref containing all SHAs in
+the repo.
+
+I have no idea why it does this in such an odd manner.
+
+=cut
+
+sub all_sha1s {
+    my $self = shift;
+    my $dir = dir( $self->gitdir, 'objects' );
+
+    my @streams;
+    push @streams, $self->loose->all_sha1s;
+
+    foreach my $pack ( $self->packs ) {
+        push @streams, $pack->all_sha1s;
+    }
+
+    return Data::Stream::Bulk::Cat->new( streams => \@streams );
+}
+
+=head3 all_objects()
+
+    my @pp_objects = @{ $git->all_objects->next };
+
+Returns a Data::Stream::Bulk::Filter object that is primed with a list of all
+SHAs in the repo and a sub that instructs the G::PP object to call get_objects()
+on that list.
+
+Calling next() on that DSBF object returns an array ref containing all objects
+relating to SHAs in the repo, like Git::PurePerl::Object::Blob, Commit, Tree or
+Tag.
+
+I have no idea why it does this in such an odd manner.
+
+=cut
+
+=head2 Read Operations
+
+=head2 Write Operations
+
+=cut
+
+sub all_objects {
+    my $self   = shift;
+    my $stream = $self->all_sha1s;
+    return Data::Stream::Bulk::Filter->new(
+        filter => sub { return [ $self->get_objects(@$_) ] },
+        stream => $stream,
+    );
 }
 
 sub ref_sha1 {
@@ -225,26 +390,6 @@ sub _ensure_sha1_is_sha1 {
 sub ref {
     my ( $self, $wantref ) = @_;
     return $self->get_object( $self->ref_sha1($wantref) );
-}
-
-sub master_sha1 {
-    my $self = shift;
-    return $self->ref_sha1('refs/heads/master');
-}
-
-sub master {
-    my $self = shift;
-    return $self->ref('refs/heads/master');
-}
-
-sub head_sha1 {
-    my $self = shift;
-    return $self->ref_sha1('HEAD');
-}
-
-sub head {
-    my $self = shift;
-    return $self->ref('HEAD');
 }
 
 sub get_object {
@@ -315,29 +460,6 @@ sub create_object {
     } else {
         confess "unknown kind $kind: $content";
     }
-}
-
-sub all_sha1s {
-    my $self = shift;
-    my $dir = dir( $self->gitdir, 'objects' );
-
-    my @streams;
-    push @streams, $self->loose->all_sha1s;
-
-    foreach my $pack ( $self->packs ) {
-        push @streams, $pack->all_sha1s;
-    }
-
-    return Data::Stream::Bulk::Cat->new( streams => \@streams );
-}
-
-sub all_objects {
-    my $self   = shift;
-    my $stream = $self->all_sha1s;
-    return Data::Stream::Bulk::Filter->new(
-        filter => sub { return [ $self->get_objects(@$_) ] },
-        stream => $stream,
-    );
 }
 
 sub put_object {
@@ -491,43 +613,6 @@ sub _add_file {
 1;
 
 __END__
-
-=head1 NAME
-
-Git::PurePerl - A Pure Perl interface to Git repositories
-
-=head1 SYNOPSIS
-
-    my $git = Git::PurePerl->new(
-        directory => '/path/to/git/'
-    );
-    $git->master->committer;
-    $git->master->comment;
-    $git->get_object($git->master->tree);
-
-=head1 DESCRIPTION
-
-This module is a Pure Perl interface to Git repositories.
-
-It was mostly based on Grit L<http://grit.rubyforge.org/>.
-
-=head1 METHODS
-
-=over 4
-
-=item master
-
-=item get_object
-
-=item get_object_packed
-
-=item get_object_loose
-
-=item create_object
-
-=item all_sha1s
-
-=back
 
 =head1 MAINTAINANCE
 
