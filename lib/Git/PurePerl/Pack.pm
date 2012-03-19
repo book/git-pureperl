@@ -10,6 +10,9 @@ has 'filename' =>
     ( is => 'ro', isa => 'Path::Class::File', required => 1, coerce => 1 );
 has 'fh' =>
     ( is => 'rw', isa => 'IO::File', required => 0, lazy_build => 1 );
+has 'zlib' =>
+    ( is => 'rw', isa => 'Compress::Raw::Zlib::inflateStream', required => 0,
+    lazy_build => 1 );
 
 my @TYPES = ( 'none', 'commit', 'tree', 'blob', 'tag', '', 'ofs_delta',
     'ref_delta' );
@@ -28,6 +31,10 @@ sub _build_fh {
     my $fh = IO::File->new( $self->filename ) || confess($!);
     $fh->binmode();
     return $fh;
+}
+
+sub _build_zlib {
+    Compress::Raw::Zlib::Inflate->new( -AppendOutput => 1, -ConsumeInput => 0 );
 }
 
 sub all_sha1s {
@@ -82,10 +89,7 @@ sub read_compressed {
     my $fh = $self->fh;
 
     $fh->seek( $offset, 0 ) || die $!;
-    my ( $deflate, $status ) = Compress::Raw::Zlib::Inflate->new(
-        -AppendOutput => 1,
-        -ConsumeInput => 0
-    );
+    my $deflate = $self->zlib;
 
     my $out = "";
     while ( length($out) < $size ) {
@@ -95,6 +99,8 @@ sub read_compressed {
     confess length($out)." is not $size" unless length($out) == $size;
 
     $fh->seek( $offset + $deflate->total_in, 0 ) || die $!;
+    $deflate->inflateReset;
+
     return $out;
 }
 
