@@ -4,12 +4,27 @@ use warnings;
 use inc::Module::Install 0.91;
 
 name 'Git-PurePerl';
-all_from 'lib/Git/PurePerl.pm';
-author 'Leon Brocard <acme@astray.com>';
+version_from 'lib/Git/PurePerl.pm';
+author(
+    'Leon Brocard <acme@astray.com>',
+    'Tokuhiro Matsuno <tokuhirom+cpan@gmail.com>',
+    'Fayland <fayland@gmail.com>',
+    'Chris Reinhardt <chris@triv.org>',
+    'Tomas Doran <bobtfish@bobtfish.net>',
+    'Jesse Luehrs <doy@cpan.org>',
+    'Alex Vandiver <cpan@chmrr.net>',
+    'Dagfinn Ilmari Mannsåker <ilmari+cpan@ilmari.org>',
+    'Dan Brook <mr.daniel.brook@gmail.com>',
+    'Christian Walde <walde.christian@googlemail.com>',
+);
 abstract 'A Pure Perl interface to Git repositories';
 license 'perl';
 
-resources repository => 'git://github.com/bobtfish/git-pureperl.git';
+resources(
+    repository => 'git://github.com/GitPurePerl/git-pureperl.git',
+    homepage => 'https://github.com/GitPurePerl/git-pureperl',
+    bugtracker => 'https://github.com/GitPurePerl/git-pureperl/issues'
+);
 
 requires        'Archive::Extract'           => '0';
 requires        'Compress::Raw::Zlib'        => '0';
