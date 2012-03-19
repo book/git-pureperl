@@ -15,6 +15,7 @@ sub create_index {
     my $index_filename = $self->filename;
     $index_filename =~ s/\.pack/.idx/;
     my $index_fh = IO::File->new("> $index_filename") || die $!;
+    $index_fh->binmode;
 
     my $iod = IO::Digest->new( $index_fh, 'SHA' );
 
