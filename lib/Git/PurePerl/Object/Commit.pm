@@ -19,11 +19,13 @@ has 'committed_time' => ( is => 'rw', isa => 'DateTime', required => 0 );
 has 'comment'        => ( is => 'rw', isa => 'Str',      required => 0 );
 has 'encoding'       => ( is => 'rw', isa => 'Str',      required => 0 );
 has 'gpg_signature'  => ( is => 'rw', isa => 'Str',      required => 0 );
+has 'merge_tag'      => ( is => 'rw', isa => 'Str',      required => 0 );
 
 my %method_map = (
-    'tree'   => [ 'tree_sha1',     '-' ],    # single line, single value
-    'parent' => [ 'parent_sha1s',  '@' ],    # multiple lines, multiple values
-    'gpgsig' => [ 'gpg_signature', '=' ],    # multiple lines, single value
+    'tree'     => [ 'tree_sha1',     '-' ],  # single line, single value
+    'parent'   => [ 'parent_sha1s',  '@' ],  # multiple lines, multiple values
+    'gpgsig'   => [ 'gpg_signature', '=' ],  # multiple lines, single value
+    'mergetag' => [ 'merge_tag',     '=' ],
 );
 
 my %time_attr = (
