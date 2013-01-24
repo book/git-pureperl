@@ -20,10 +20,13 @@ has 'comment'        => ( is => 'rw', isa => 'Str',      required => 0 );
 has 'encoding'       => ( is => 'rw', isa => 'Str',      required => 0 );
 
 my %method_map = (
-    'tree'      => 'tree_sha1',
-    'parent'    => '_push_parent_sha1',
+    'tree'   => [ 'tree_sha1',     '-' ],    # single line, single value
+    'parent' => [ 'parent_sha1s',  '@' ],    # multiple lines, multiple values
+);
+
+my %time_attr = (
     'author'    => 'authored_time',
-    'committer' => 'committed_time'
+    'committer' => 'committed_time',
 );
 
 sub BUILD {
@@ -32,47 +35,46 @@ sub BUILD {
     my @lines = split "\n", $self->content;
     my %header;
     while ( my $line = shift @lines ) {
-        my ( $key, $value ) = split ' ', $line, 2;
+        my ( $key, $value ) = split / /, $line, 2;
         push @{$header{$key}}, $value;
+        $header{''} = $header{$key} if $key;
     }
+    delete $header{''};
     $header{encoding}
         ||= [ $self->git->config->get(key => "i18n.commitEncoding") || "utf-8" ];
     my $encoding = $header{encoding}->[-1];
-    for my $key (keys %header) {
-        for my $value (@{$header{$key}}) {
-            $value = decode($encoding, $value);
-            if ( $key eq 'committer' or $key eq 'author' ) {
-                my @data = split ' ', $value;
-                my ( $email, $epoch, $tz ) = splice( @data, -3 );
-                $email = substr( $email, 1, -1 );
-                my $name = join ' ', @data;
-                my $actor
-                    = Git::PurePerl::Actor->new( name => $name, email => $email );
-                $self->$key($actor);
-                $key = $method_map{$key};
-                my $dt
-                    = DateTime->from_epoch( epoch => $epoch, time_zone => $tz );
-                $self->$key($dt);
-            } else {
-                $key = $method_map{$key} || $key;
-                $self->$key($value);
-            }
+    for my $key ( keys %header ) {
+        my ( $attr, $type ) = @{ $method_map{$key} || [ $key, '-' ] };
+        $header{$key} = [ map decode( $encoding, $_ ), @{ $header{$key} } ];
+
+        if ( $key eq 'committer' or $key eq 'author' ) {
+            my @data = split ' ', $header{$key}[-1];
+            my ( $email, $epoch, $tz ) = splice( @data, -3 );
+            $email = substr( $email, 1, -1 );
+            my $name = join ' ', @data;
+            my $actor
+                = Git::PurePerl::Actor->new( name => $name, email => $email );
+            $self->$attr($actor);
+            $attr = $time_attr{$attr};
+            my $dt
+                = DateTime->from_epoch( epoch => $epoch, time_zone => $tz );
+            $self->$attr($dt);
+        }
+        else {
+            my $value
+                = $type eq '-' ? $header{$key}[-1]
+                : $type eq '@' ? $header{$key}
+                : $type eq '=' ? join( "\n", @{ $header{$key} } ) . "\n"
+                :   die "Unknown type $type in $attr handler for $key";
+            $self->$attr($value);
         }
     }
     $self->comment( decode($encoding, join "\n", @lines) );
 }
 
-
 sub tree {
     my $self = shift;
     return $self->git->get_object( $self->tree_sha1 );
-}
-
-
-sub _push_parent_sha1 {
-    my ($self, $sha1) = @_;
-  
-    push(@{$self->parent_sha1s}, $sha1);
 }
 
 sub parent_sha1 {
